@@ -28,76 +28,135 @@ struct HomeView: View {
     
     
     @State private var isScrollingDown = false
-    @State private var scrollOffset: CGFloat = 0
     @State private var lastScrollOffset: CGFloat = 0
+    @State private var isScrolling = false
+    @State private var hideTimer: Timer?
+    
     init(viewModel: HomeViewModel) {
         _viewModel = StateObject(wrappedValue: viewModel)
     }
     
     var body: some View {
-        GeometryReader { geometry in
-            
-            ZStack(alignment: .bottom){
-                ScrollView {
-                    ZStack(alignment: .top) {
-                        GeometryReader { geo in
-                            Color.clear
-                                .preference(key: ScrollOffsetPreferenceKey.self, value: geo.frame(in: .global).minY)
-                        }
-                        .frame(height: 0)
-                        // Background content
-                        backgroundContent
-                        
-                        // Main content
-                        mainContent
-                        
+        
+        ZStack(alignment: .bottom){
+            ScrollView {
+                ZStack(alignment: .top) {
+                    
+                    // Background content
+                    backgroundContent
+                    
+                    // Main content
+                    mainContent
+                    
+                    GeometryReader { geo in
+                        Color.clear
+                            .preference(
+                                key: ScrollOffsetPreferenceKey.self,
+                                value: geo.frame(in: .named("scroll")).minY
+                            )
                     }
-                    .frame(maxWidth: .infinity)
+                    .frame(height: 0)
+                    
                 }
-                .background(Color.black)
-                .ignoresSafeArea(edges: .all)
-                .overlay(loadingOverlay)
-                .errorAlert(error: $viewModel.error, retryAction: viewModel.fetchMovie)
-                .onAppear(perform: viewModel.fetchMovie)
-                .onPreferenceChange(ScrollOffsetPreferenceKey.self) { value in
-                    scrollOffset = value
-                }
-                
-                bottomMenuBar
-                    .offset(y: scrollOffset < -50 ? 0 : 50) // Show/hide based on scroll position
-                    .animation(.easeInOut(duration: 0.3), value: scrollOffset)
+                .frame(maxWidth: .infinity)
             }
-            .frame(height: geometry.size.height)
+            .coordinateSpace(name: "scroll") // Add coordinate space
+            .onPreferenceChange(ScrollOffsetPreferenceKey.self) { value in
+                handleScrollOffsetChange(value: value)
+            }
+            .background(Color.black)
+            .ignoresSafeArea(edges: .all)
+            .overlay(loadingOverlay)
+            .errorAlert(error: $viewModel.error, retryAction: viewModel.fetchMovie)
+            .onAppear(perform: viewModel.fetchMovie)
+            
+            
+            bottomMenuBar
+                .offset(y: isScrolling ? 100 : 30)
+                .opacity(isScrolling ? 0 : 1)
+                .animation(.easeInOut(duration: 0.3), value: isScrolling)
+            
         }
         
     }
     
-    // MARK: - Bottom Menu Bar
-    private var bottomMenuBar: some View {
-        HStack(spacing: 20) {
-            ForEach(0..<menuItems.count, id: \.self) { index in
-                
-                Button(action: {
-                    selectedMenuIndex = index
-                }) {
-                    Image(systemName: menuItems[index])
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .frame(width: 24, height: 24)
-                        .foregroundColor(index == selectedMenuIndex ? .white : .white.opacity(0.6))
-                        .padding(12)
-                        .animation(.easeInOut(duration: 0.3), value: selectedMenuIndex)
-                }
+    private func handleScrollOffsetChange(value: CGFloat) {
+        // Calculate scroll velocity
+        let velocity = value - lastScrollOffset
+        
+        // Only consider significant movements to prevent flickering
+        if abs(velocity) > 1 {
+            // Scrolling is happening
+            isScrolling = true
+            
+            // Reset any existing timer
+            hideTimer?.invalidate()
+            
+            // Set a timer to detect when scrolling stops
+            hideTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: false) { _ in
+                isScrolling = false
             }
         }
-        .padding(.horizontal, 32)
-        .padding(.vertical, 10)
-        .frame(height: 70)
-        .background(Capsule().foregroundColor(.black.opacity(0.7)))
-        .padding(.bottom, 20)
-        .shadow(radius: 10)
+        
+        lastScrollOffset = value
     }
     
+    // MARK: - Bottom Menu Bar
+    private var bottomMenuBar: some View {
+        GeometryReader { geometry in
+            let width = geometry.size.width
+            let tabWidth = width / CGFloat(menuItems.count)
+            let indicatorX = tabWidth * (CGFloat(selectedMenuIndex) + 0.5)
+            
+            ZStack(alignment: .top) {
+                // Curved background with extended top for the indicator
+                Capsule()
+                    .fill(Color.gray)
+                    .frame(height: 70)
+                
+                // Moving indicator with bottom half stroke
+                ZStack {
+                    // Main circle
+                    Circle()
+                        .fill(Color.gray)
+                        .frame(width: 15, height: 15)
+                    
+                    // Bottom half stroke
+                    Circle()
+                        .trim(from: 0.5, to: 1.0) // Only show bottom half
+                        .rotation(Angle(degrees: 180))
+                        .stroke(Color.white, lineWidth: 2)
+                        .frame(width: 17, height: 17) // Slightly larger for stroke visibility
+                }
+                .position(x: indicatorX, y: 0)
+                .animation(.spring(response: 0.3, dampingFraction: 0.7), value: selectedMenuIndex)
+                
+                
+                // Tab items
+                HStack(spacing: 0) {
+                    ForEach(0..<menuItems.count, id: \.self) { index in
+                        Button(action: {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                selectedMenuIndex = index
+                            }
+                        }) {
+                            Image(systemName: menuItems[index])
+                                .resizable()
+                                .aspectRatio(contentMode: .fit)
+                                .frame(width: 24, height: 24)
+                                .foregroundColor(index == selectedMenuIndex ? .white : .white.opacity(0.6))
+                                .frame(width: tabWidth, height: 50)
+                        }
+                    }
+                }
+                .padding(.top, 10)
+            }
+            .frame(width: width, height: 70)
+        }
+        .frame(height: 70)
+        .padding(.horizontal, 20)
+        .padding(.bottom, 20)
+    }
     
     // MARK: - Subviews
     
@@ -130,6 +189,8 @@ struct HomeView: View {
             movieInfoSection
             movieListSection
         }
+        .padding(.bottom, 20)
+        
     }
     
     private var carouselSection: some View {
