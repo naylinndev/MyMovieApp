@@ -27,16 +27,6 @@ Using Swift Package Manager:
 - [`Moya`](https://github.com/Moya/Moya)
 - [`Kingfisher`](https://github.com/onevcat/Kingfisher) *(optional: for image loading)*
 
-> 🔥 No third-party UI layout libs used (staggered layout is fully custom).
-
----
-
-## 🧪 RxSwift Highlights
-
-- Data binding with `BehaviorRelay`
-- `collectionView.rx.contentOffset` for infinite scroll
-- Detail screen uses reactive data flow for UI updates
-
 
 ---
 ## 🚀 Getting Started
