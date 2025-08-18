@@ -13,7 +13,7 @@ An iOS movie app built with **SwiftUI** and **RxSwift**, showcasing movie lists,
 
 ## 🛠 Architecture
 
-- **UIKit + MVVM**
+- **SwiftUI**
 - **RxSwift / RxCocoa / RxRelay**
 - **Moya** for API abstraction
 ---
